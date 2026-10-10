@@ -1,0 +1,480 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>ARENA STRIKE - Online FPS</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080d16;color:#fff;font-family:Arial,"Noto Sans TC",sans-serif}
+canvas{display:block}
+#game{position:fixed;inset:0}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:3}
+.panel{background:#101a28df;border:1px solid #40546b;border-radius:9px;padding:10px 13px;backdrop-filter:blur(8px)}
+#top{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+#status{font-size:12px;color:#7dffba}
+#stats{font-size:13px;line-height:1.8}
+#board{position:absolute;right:12px;top:78px;width:180px;max-height:42vh;overflow:auto;font-size:12px}
+#board h3{margin:0 0 7px;font-size:14px;color:#66dcff}
+.scoreRow{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid #ffffff16}
+#crosshair{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%)}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff;box-shadow:0 0 3px #000}
+#crosshair:before{width:2px;height:22px;left:10px}
+#crosshair:after{height:2px;width:22px;top:10px}
+#message{position:absolute;top:27%;left:50%;transform:translateX(-50%);font-size:19px;font-weight:bold;text-align:center;text-shadow:0 2px 8px #000}
+#bottom{position:absolute;left:12px;bottom:12px;display:flex;gap:8px;align-items:end}
+#healthBar{width:150px;height:8px;background:#44272b;border-radius:5px;overflow:hidden;margin-top:5px}
+#healthFill{height:100%;width:100%;background:#4aff91;transition:width .15s}
+#ammo{font-size:24px;font-weight:bold}
+#lobby{position:fixed;z-index:10;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(#07101be8,#101a26ed);padding:18px}
+#lobbyCard{width:min(440px,100%);padding:26px;border:1px solid #34516b;border-radius:16px;background:#101a28;box-shadow:0 15px 70px #0009}
+h1{font-size:30px;letter-spacing:2px;margin:0 0 5px;color:#64dfff}
+.sub{color:#8ea4bb;font-size:12px;letter-spacing:2px;margin-bottom:22px}
+input,button{font:inherit}
+input{width:100%;padding:13px;border:1px solid #3b536d;border-radius:8px;background:#07111e;color:#fff;margin:8px 0 12px;outline:none}
+button{border:0;border-radius:8px;padding:12px 16px;background:#13bce9;color:#04111a;font-weight:bold;cursor:pointer}
+button:active{transform:scale(.97)}
+#join{width:100%;font-size:16px}
+#hint{font-size:12px;line-height:1.8;color:#94a8bc;margin-top:15px}
+#touchUI{display:none;position:fixed;z-index:5;inset:0;pointer-events:none}
+#stickZone{position:absolute;left:15px;bottom:20px;width:130px;height:130px;border-radius:50%;background:#ffffff12;border:2px solid #ffffff45;pointer-events:auto;touch-action:none}
+#stick{position:absolute;width:50px;height:50px;border-radius:50%;background:#71ddff88;border:2px solid #c6f5ff;left:38px;top:38px}
+#lookZone{position:absolute;left:35%;right:0;top:12%;bottom:24%;pointer-events:auto;touch-action:none}
+.action{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;width:66px;height:66px;border:2px solid #ffffff88;background:#172b42bb;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px}
+#fire{right:20px;bottom:34px;width:82px;height:82px;background:#d94242cc}
+#reload{right:108px;bottom:45px}
+#jump{right:24px;bottom:133px}
+#mobileTip{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);font-size:10px;color:#d9e8f4;white-space:nowrap}
+#deadOverlay{position:fixed;inset:0;background:#080b12a8;z-index:8;display:none;align-items:center;justify-content:center;text-align:center;font-size:24px;font-weight:bold}
+#deadOverlay small{display:block;font-size:13px;color:#c3d2e1;margin-top:12px}
+@media(hover:none),(pointer:coarse){
+ #touchUI{display:block}
+ #board{top:105px;width:140px;font-size:11px}
+ #top{top:7px;left:7px;right:7px}
+ #bottom{left:7px;bottom:7px}
+ #healthBar{width:100px}
+ #stats{font-size:11px}
+}
+@media(orientation:portrait) and (pointer:coarse){
+ #lobbyCard{padding:20px}
+ #lobbyCard h1{font-size:25px}
+}
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="lobby">
+ <div id="lobbyCard">
+  <h1>ARENA STRIKE</h1>
+  <div class="sub">ONLINE MULTIPLAYER FPS</div>
+  <label for="playerName">你的戰場名稱</label>
+  <input id="playerName" maxlength="18" placeholder="輸入玩家名稱" value="Player">
+  <button id="join">進入公開戰場</button>
+  <div id="connectStatus" style="margin-top:12px;color:#ffce6c;font-size:12px">等待連線…</div>
+  <div id="hint">
+   電腦：WASD 移動、滑鼠瞄準、左鍵射擊、R 換彈、空白鍵跳躍。<br>
+   手機：左側搖桿移動、右側滑動瞄準、射擊及換彈按鈕。<br>
+   需要連上遊戲伺服器才能進入多人戰場。
+  </div>
+ </div>
+</div>
+
+<div id="hud">
+ <div id="top">
+  <div class="panel">
+   <div id="status">● 尚未連線</div>
+   <div id="stats">玩家：0<br>擊殺：0　死亡：0</div>
+  </div>
+  <div class="panel" style="text-align:right">
+   <div style="font-size:11px;color:#8ca9c2">ARENA STRIKE</div>
+   <div id="ammo">30 <span style="font-size:12px;color:#91a6bb">/ 30</span></div>
+  </div>
+ </div>
+ <div id="board" class="panel"><h3>即時排行榜</h3><div id="boardRows">等待玩家加入…</div></div>
+ <div id="crosshair"></div>
+ <div id="message"></div>
+ <div id="bottom">
+  <div class="panel">
+   <div id="healthText">HP 100 / 100</div>
+   <div id="healthBar"><div id="healthFill"></div></div>
+  </div>
+ </div>
+</div>
+
+<div id="touchUI">
+ <div id="stickZone"><div id="stick"></div></div>
+ <div id="lookZone"></div>
+ <button class="action" id="fire">射擊</button>
+ <button class="action" id="reload">換彈</button>
+ <button class="action" id="jump">跳躍</button>
+ <div id="mobileTip">左側移動・右側滑動瞄準</div>
+</div>
+
+<div id="deadOverlay"><div>你已被擊倒<small id="respawnText">等待重生…</small></div></div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+
+const $=id=>document.getElementById(id);
+const game=$("game");
+let scene,camera,renderer,clock;
+let ws=null,myId=null,started=false,connected=false;
+let players=new Map(),obstacles=[];
+let yaw=0,pitch=0;
+let keys={};
+let moveX=0,moveZ=0,jumpRequested=false;
+let ammo=30,health=100,kills=0,deaths=0;
+let lastInput=0,lastFire=0,lastJump=0;
+let reloading=false,dead=false;
+let localY=1.65,verticalSpeed=0;
+const remoteMaterials={};
+const PLAYER_HEIGHT=1.65;
+
+function makeMaterial(color,roughness=.8){
+ return new THREE.MeshStandardMaterial({color,roughness});
+}
+function addBox(x,y,z,sx,sy,sz,color){
+ const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),makeMaterial(color));
+ mesh.position.set(x,y,z);
+ mesh.castShadow=true;
+ mesh.receiveShadow=true;
+ scene.add(mesh);
+ obstacles.push({x,z,sx,sz});
+ return mesh;
+}
+function init3D(){
+ scene=new THREE.Scene();
+ scene.background=new THREE.Color(0x9ab5c8);
+ scene.fog=new THREE.Fog(0x9ab5c8,35,100);
+ camera=new THREE.PerspectiveCamera(78,innerWidth/innerHeight,.1,180);
+ renderer=new THREE.WebGLRenderer({antialias:true, powerPreference:"low-power"});
+ renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.shadowMap.enabled=true;
+ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+ game.appendChild(renderer.domElement);
+ clock=new THREE.Clock();
+
+ scene.add(new THREE.HemisphereLight(0xdceeff,0x34404b,2.1));
+ const sun=new THREE.DirectionalLight(0xffffff,2.2);
+ sun.position.set(-15,30,10);
+ sun.castShadow=true;
+ sun.shadow.mapSize.set(1024,1024);
+ scene.add(sun);
+
+ const ground=new THREE.Mesh(
+  new THREE.PlaneGeometry(100,100),
+  makeMaterial(0x4b5965)
+ );
+ ground.rotation.x=-Math.PI/2;
+ ground.receiveShadow=true;
+ scene.add(ground);
+
+ const grid=new THREE.GridHelper(100,50,0x728594,0x657480);
+ grid.position.y=.015;
+ scene.add(grid);
+
+ // Arena walls
+ addBox(0,2,-25,52,4,1,0x273c4d);
+ addBox(0,2,25,52,4,1,0x273c4d);
+ addBox(-25,2,0,1,4,50,0x273c4d);
+ addBox(25,2,0,1,4,50,0x273c4d);
+
+ // Cover and obstacles
+ addBox(-10,.9,-7,5,1.8,2,0x587182);
+ addBox(8,.9,-8,4,1.8,3,0x4b6878);
+ addBox(0,.8,1,3,1.6,3,0x536a78);
+ addBox(-13,.8,10,3,1.6,4,0x526475);
+ addBox(12,.8,11,5,1.6,2,0x536a78);
+ addBox(0,1.1,16,7,2.2,2,0x3e596b);
+ addBox(-17,1,-1,2,2,5,0x647784);
+ addBox(18,1,-1,2,2,5,0x647784);
+
+ // Lighting posts
+ for(const p of [[-20,0,-20],[20,0,-20],[-20,0,20],[20,0,20]]){
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(.12,.18,5,8),makeMaterial(0x283a49));
+  pole.position.set(p[0],2.5,p[2]);scene.add(pole);
+  const lamp=new THREE.PointLight(0x8adfff,8,13);
+  lamp.position.set(p[0],4.7,p[2]);scene.add(lamp);
+ }
+
+ window.addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+ });
+}
+
+function createPlayerMesh(id,color,name){
+ const group=new THREE.Group();
+ const mat=makeMaterial(color);
+ const dark=makeMaterial(0x182331);
+ const body=new THREE.Mesh(new THREE.BoxGeometry(.72,.88,.38),mat);
+ body.position.y=.95;body.castShadow=true;group.add(body);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.25,12,10),makeMaterial(0xe0b997));
+ head.position.y=1.57;head.castShadow=true;group.add(head);
+ const helmet=new THREE.Mesh(new THREE.SphereGeometry(.27,12,8,0,Math.PI*2,0,Math.PI*.52),dark);
+ helmet.position.y=1.68;group.add(helmet);
+ const legs=[];
+ for(const side of [-1,1]){
+  const leg=new THREE.Mesh(new THREE.BoxGeometry(.25,.65,.28),dark);
+  leg.position.set(side*.2,.34,0);leg.castShadow=true;group.add(leg);legs.push(leg);
+  const arm=new THREE.Mesh(new THREE.BoxGeometry(.19,.62,.2),mat);
+  arm.position.set(side*.48,.96,-.03);group.add(arm);
+ }
+ // Simple rifle model
+ const gun=new THREE.Mesh(new THREE.BoxGeometry(.14,.13,.85),makeMaterial(0x151a20));
+ gun.position.set(.34,1.12,-.52);group.add(gun);
+ group.userData={id,name,body,head,legs};
+ scene.add(group);
+ return group;
+}
+
+function updateRemotePlayers(list){
+ const seen=new Set();
+ for(const p of list){
+  if(p.id===myId)continue;
+  seen.add(p.id);
+  let obj=players.get(p.id);
+  if(!obj){
+   obj=createPlayerMesh(p.id,p.color||0x22bde8,p.name||"Player");
+   players.set(p.id,obj);
+  }
+  obj.position.set(p.x,p.y||0,p.z);
+  obj.rotation.y=p.yaw||0;
+  obj.visible=!p.dead;
+  obj.userData.name=p.name||"Player";
+  obj.userData.hp=p.health;
+ }
+ for(const [id,obj] of players){
+  if(!seen.has(id)){
+   scene.remove(obj);
+   players.delete(id);
+  }
+ }
+}
+
+function send(data){
+ if(ws&&ws.readyState===WebSocket.OPEN){
+  ws.send(JSON.stringify(data));
+ }
+}
+function connect(){
+ const name=$("playerName").value.trim().slice(0,18)||"Player";
+ const protocol=location.protocol==="https:"?"wss:":"ws:";
+ const url=protocol+"//"+location.host;
+ $("connectStatus").textContent="正在連接多人伺服器…";
+ try{ws=new WebSocket(url)}catch(e){
+  $("connectStatus").textContent="連線失敗，請檢查伺服器網址。";return;
+ }
+ ws.onopen=()=>{
+  connected=true;
+  send({type:"join",name});
+  $("connectStatus").textContent="伺服器已連線，正在加入戰場…";
+  $("connectStatus").style.color="#79ffb4";
+ };
+ ws.onmessage=event=>{
+  let data;
+  try{data=JSON.parse(event.data)}catch(e){return}
+  if(data.type==="init"){
+   myId=data.id;
+   started=true;
+   $("lobby").style.display="none";
+   $("status").textContent="● 已連線・公開戰場";
+   if(matchMedia("(pointer:fine)").matches){
+    renderer.domElement.requestPointerLock?.();
+   }
+  }
+  if(data.type==="state"){
+   if(!started)return;
+   updateRemotePlayers(data.players||[]);
+   const me=(data.players||[]).find(p=>p.id===myId);
+   if(me){
+    camera.position.set(me.x,me.y+PLAYER_HEIGHT,me.z);
+    health=me.health;kills=me.kills;deaths=me.deaths;
+    ammo=me.ammo;
+    dead=!!me.dead;
+    localY=me.y||0;
+    $("healthText").textContent="HP "+health+" / 100";
+    $("healthFill").style.width=Math.max(0,health)+"%";
+    $("healthFill").style.background=health<30?"#ff4646":"#4aff91";
+    $("ammo").innerHTML=ammo+' <span style="font-size:12px;color:#91a6bb">/ 30</span>';
+    $("stats").innerHTML="玩家："+data.players.filter(p=>!p.dead).length+
+      "<br>擊殺："+kills+"　死亡："+deaths;
+    $("deadOverlay").style.display=dead?"flex":"none";
+    if(dead)$("respawnText").textContent="正在等待重生…";
+   }
+   renderBoard(data.players||[]);
+  }
+  if(data.type==="notice"){
+   $("message").textContent=data.text||"";
+   clearTimeout(window.noticeTimer);
+   window.noticeTimer=setTimeout(()=>{$("message").textContent=""},1800);
+  }
+  if(data.type==="error"){
+   $("connectStatus").textContent=data.message||"連線錯誤";
+  }
+ };
+ ws.onerror=()=>{
+  $("connectStatus").textContent="連線錯誤：請確認多人伺服器已啟動。";
+ };
+ ws.onclose=()=>{
+  connected=false;
+  $("status").textContent="● 連線中斷";
+  if(started){
+   $("message").textContent="與伺服器中斷連線";
+   $("message").style.color="#ff7676";
+  }
+ };
+}
+
+function renderBoard(list){
+ const sorted=[...list].sort((a,b)=>b.kills-a.kills||a.deaths-b.deaths);
+ $("boardRows").innerHTML=sorted.slice(0,12).map((p,i)=>
+  '<div class="scoreRow"><span>'+((i+1)+". ")+escapeHTML(p.name)+(p.id===myId?" ★":"")+
+  '</span><span>'+p.kills+' / '+p.deaths+'</span></div>'
+ ).join("")||"等待玩家加入…";
+}
+function escapeHTML(s){
+ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function updateAim(){
+ camera.rotation.order="YXZ";
+ camera.rotation.y=yaw;
+ camera.rotation.x=pitch;
+}
+function fire(){
+ if(!started||dead||!connected||reloading)return;
+ const now=performance.now();
+ if(now-lastFire<100)return;
+ lastFire=now;
+ send({type:"fire",yaw,pitch});
+ $("crosshair").style.transform="translate(-50%,-50%) scale(.82)";
+ setTimeout(()=>$("crosshair").style.transform="translate(-50%,-50%)",65);
+}
+function reload(){
+ if(!started||dead||reloading||ammo>=30)return;
+ reloading=true;
+ send({type:"reload"});
+ $("message").textContent="換彈中…";
+ setTimeout(()=>{reloading=false;$("message").textContent=""},1550);
+}
+
+document.addEventListener("keydown",e=>{
+ keys[e.code]=true;
+ if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code))e.preventDefault();
+ if(e.code==="KeyR")reload();
+ if(e.code==="Space")jumpRequested=true;
+});
+document.addEventListener("keyup",e=>{keys[e.code]=false});
+document.addEventListener("mousemove",e=>{
+ if(document.pointerLockElement===renderer?.domElement&&started){
+  yaw-=e.movementX*.0022;
+  pitch-=e.movementY*.0022;
+  pitch=THREE.MathUtils.clamp(pitch,-1.35,1.35);
+  updateAim();
+ }
+});
+rendererPointerSetup();
+function rendererPointerSetup(){
+ document.addEventListener("pointerlockchange",()=>{
+  if(document.pointerLockElement!==renderer?.domElement&&started){
+   // Pointer lock can be reacquired by clicking the game.
+  }
+ });
+}
+game.addEventListener("click",()=>{
+ if(started&&matchMedia("(pointer:fine)").matches&&document.pointerLockElement!==renderer.domElement){
+  renderer.domElement.requestPointerLock?.();
+ }
+});
+game.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("mousedown",e=>{
+ if(e.button===0&&started&&document.pointerLockElement===renderer?.domElement)fire();
+});
+
+$("join").addEventListener("click",()=>{
+ if(started)return;
+ if(location.protocol==="file:"){
+  $("connectStatus").textContent="請先部署伺服器，並透過 http:// 或 https:// 網址開啟遊戲。";
+  return;
+ }
+ connect();
+});
+
+// Touch movement joystick
+const zone=$("stickZone"),stick=$("stick");
+let stickPointer=null,stickCenter={x:0,y:0};
+zone.addEventListener("pointerdown",e=>{
+ e.preventDefault();stickPointer=e.pointerId;zone.setPointerCapture(e.pointerId);
+ const r=zone.getBoundingClientRect();
+ stickCenter={x:r.left+r.width/2,y:r.top+r.height/2};
+ moveStick(e);
+});
+zone.addEventListener("pointermove",e=>{if(e.pointerId===stickPointer)moveStick(e)});
+function moveStick(e){
+ const dx=e.clientX-stickCenter.x,dy=e.clientY-stickCenter.y;
+ const max=43,len=Math.hypot(dx,dy)||1,k=Math.min(1,max/len);
+ const x=dx*k,y=dy*k;
+ stick.style.left=(40+x)+"px";stick.style.top=(40+y)+"px";
+ moveX=x/max;moveZ=y/max;
+}
+function resetStick(){
+ stickPointer=null;moveX=0;moveZ=0;
+ stick.style.left="38px";stick.style.top="38px";
+}
+zone.addEventListener("pointerup",resetStick);
+zone.addEventListener("pointercancel",resetStick);
+
+// Touch look
+const lookZone=$("lookZone");
+let lookPointer=null,lastLook={x:0,y:0};
+lookZone.addEventListener("pointerdown",e=>{
+ lookPointer=e.pointerId;lastLook={x:e.clientX,y:e.clientY};
+ lookZone.setPointerCapture(e.pointerId);
+});
+lookZone.addEventListener("pointermove",e=>{
+ if(e.pointerId!==lookPointer)return;
+ const dx=e.clientX-lastLook.x,dy=e.clientY-lastLook.y;
+ yaw-=dx*.006;
+ pitch=THREE.MathUtils.clamp(pitch-dy*.006,-1.35,1.35);
+ lastLook={x:e.clientX,y:e.clientY};
+ updateAim();
+});
+function stopLook(){lookPointer=null}
+lookZone.addEventListener("pointerup",stopLook);
+lookZone.addEventListener("pointercancel",stopLook);
+$("fire").addEventListener("pointerdown",e=>{e.preventDefault();fire()});
+$("reload").addEventListener("pointerdown",e=>{e.preventDefault();reload()});
+$("jump").addEventListener("pointerdown",e=>{e.preventDefault();jumpRequested=true});
+
+function gameLoop(){
+ requestAnimationFrame(gameLoop);
+ if(!scene)return;
+ const now=performance.now();
+ if(started&&connected&&now-lastInput>45){
+  lastInput=now;
+  let forward=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0);
+  let strafe=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+  forward+=-moveZ;
+  strafe+=moveX;
+  const len=Math.hypot(forward,strafe);
+  if(len>1){forward/=len;strafe/=len}
+  send({type:"input",forward,strafe,yaw,pitch,jump:jumpRequested});
+  jumpRequested=false;
+ }
+ updateAim();
+ renderer.render(scene,camera);
+}
+init3D();
+gameLoop();
+</script>
+</body>
+</html>
